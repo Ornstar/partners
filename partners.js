@@ -7,26 +7,8 @@
 
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  /* =========================
-     WAJIB: isi selector di sini
-     ========================= */
-  const TOGGLE_SELECTORS = [
-    // contoh:
-    // ".floating-social .toggle",
-    // "#menuToggle",
-    // ".hamburger",
-  ];
-
-  const STACK_CONTAINERS = [
-    // contoh container list icon saat open:
-    // ".floating-social .items",
-    // ".floating-social",
-    // "#sticky-leftbar",
-  ];
-
-  /* jarak tombol kita dari tombol biru saat mode CLOSED (fixed) */
-  const GAP_ABOVE_TOGGLE = 12;
   const BTN_SIZE = 56;
+  const GAP = 10; // jarak rapi
 
   if (document.getElementById(WRAP_ID)) return;
 
@@ -41,6 +23,12 @@
     #${WRAP_ID}.hidden{
       opacity:0; transform: translateY(10px);
       pointer-events:none;
+    }
+    #${WRAP_ID}.in-stack{
+      position: static !important;
+      margin: ${GAP}px auto 0;
+      transform:none !important;
+      width:${BTN_SIZE}px;height:${BTN_SIZE}px;
     }
 
     #${BTN_ID}{
@@ -78,14 +66,6 @@
       color:#EAF3FF;
     }
     .mauslot-icon svg{ width:22px;height:22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
-
-    /* ketika ditempel ke stack, biar rapi seperti icon lain */
-    #${WRAP_ID}.in-stack{
-      position: static !important;
-      width:${BTN_SIZE}px;height:${BTN_SIZE}px;
-      margin: 10px auto 0;
-      transform:none !important;
-    }
   `;
 
   function injectCSS() {
@@ -96,72 +76,99 @@
     document.head.appendChild(s);
   }
 
-  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
-
-  function findFirst(selectors){
-    for (const sel of selectors){
-      if (!sel) continue;
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return null;
+  function isVisible(el){
+    if (!el) return false;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 20 && r.height > 20;
   }
 
-  // fallback auto detect tombol biru fixed kiri bawah
-  function autoFindToggle(){
-    const nodes = Array.from(document.querySelectorAll("button,a,div"))
+  // Cari tombol fixed kiri bawah (hamburger / download) dari bentuk & posisi
+  function findFixedLeftButtons(){
+    const all = Array.from(document.querySelectorAll("button,a,div"))
       .filter(el => {
         const cs = getComputedStyle(el);
         if (cs.position !== "fixed") return false;
+        if (!isVisible(el)) return false;
+
         const r = el.getBoundingClientRect();
+        // area kiri & bawah layar
+        const nearLeft = r.left < 60;
+        const nearBottom = (window.innerHeight - r.bottom) < 220;
+        if (!nearLeft || !nearBottom) return false;
+
+        // ukuran button
         if (r.width < 35 || r.width > 90) return false;
         if (r.height < 35 || r.height > 90) return false;
-        if (r.left > 50) return false;
-        if ((window.innerHeight - r.bottom) > 170) return false;
-        return cs.cursor === "pointer" || el.tagName === "BUTTON" || el.tagName === "A";
+
+        return true;
       });
-    nodes.sort((a,b)=> b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
-    return nodes[0] || null;
+
+    // urut dari paling bawah
+    all.sort((a,b)=> b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
+    return all;
   }
 
-  function isOpenState(toggleBtn){
-    if (!toggleBtn) return false;
-    const cls = toggleBtn.classList;
-    if (cls.contains("open") || cls.contains("active") || cls.contains("is-open") || cls.contains("show")) return true;
-    const ae = toggleBtn.getAttribute("aria-expanded");
-    if (ae === "true") return true;
-    // fallback: kalau ada body class open/menu-open
-    const bcls = document.body.classList;
-    if (bcls.contains("open") || bcls.contains("menu-open") || bcls.contains("sidebar-open")) return true;
-    return false;
+  // Heuristik: hamburger biasanya paling bawah (atau dekat bawah) dan punya garis/menu
+  function guessHamburger(btns){
+    // kandidat paling bawah
+    return btns[0] || null;
   }
 
-  function placeFixedNearToggle(wrap, toggleBtn){
-    if (!toggleBtn) return;
-    const r = toggleBtn.getBoundingClientRect();
-    const left = r.left + (r.width/2) - (BTN_SIZE/2);
-    const top  = r.top - GAP_ABOVE_TOGGLE - BTN_SIZE;
+  // Heuristik: download biasanya ada panah bawah / ikon download di dalamnya, dan posisinya di atas hamburger
+  function guessDownload(btns, hamburger){
+    if (!hamburger) return null;
+    const hr = hamburger.getBoundingClientRect();
 
-    wrap.style.left = clamp(left, 6, window.innerWidth - BTN_SIZE - 6) + "px";
-    wrap.style.top  = clamp(top,  6, window.innerHeight - BTN_SIZE - 6) + "px";
+    const cand = btns
+      .map(el => ({ el, r: el.getBoundingClientRect() }))
+      .filter(x => x.r.bottom < hr.top - 10) // di atas hamburger
+      .sort((a,b)=> b.r.bottom - a.r.bottom)[0];
+
+    return cand ? cand.el : null;
   }
 
-  function moveToStack(wrap){
-    const host = findFirst(STACK_CONTAINERS);
-    if (!host) return false;
+  // Cari container stack saat open: biasanya parent yang punya banyak icon di kiri
+  function findStackContainerAround(el){
+    if (!el) return null;
+    let p = el.parentElement;
+    for (let i=0;i<8 && p;i++){
+      const cs = getComputedStyle(p);
+      const r = p.getBoundingClientRect();
+      const looksLeft = r.left < 80;
+      const hasManyButtons = p.querySelectorAll("a,button").length >= 4;
+      if ((cs.position === "fixed" || cs.position === "absolute") && looksLeft && hasManyButtons) return p;
+      p = p.parentElement;
+    }
+    // fallback: cari fixed container kiri yang punya banyak icon
+    const containers = Array.from(document.querySelectorAll("div,nav,aside"))
+      .filter(c => {
+        const cs = getComputedStyle(c);
+        if (cs.position !== "fixed") return false;
+        const r = c.getBoundingClientRect();
+        if (r.left > 80) return false;
+        if (r.width < 50) return false;
+        return c.querySelectorAll("a,button").length >= 4;
+      })
+      .sort((a,b)=> b.getBoundingClientRect().height - a.getBoundingClientRect().height);
 
-    // jika host pakai list icon, kita tempel ikut barisan
-    wrap.classList.add("in-stack");
-    wrap.style.left = "auto";
-    wrap.style.top  = "auto";
-
-    host.appendChild(wrap);
-    return true;
+    return containers[0] || null;
   }
 
-  function moveToBodyFixed(wrap){
-    if (wrap.parentNode !== document.body) document.body.appendChild(wrap);
-    wrap.classList.remove("in-stack");
+  // Deteksi open: ketika stack container “tinggi” dan ada tombol close (X) atau item banyak terlihat
+  function isOpen(stack){
+    if (!stack) return false;
+    const r = stack.getBoundingClientRect();
+    const many = stack.querySelectorAll("a,button").length >= 5;
+    const tall = r.height > 220;
+    // cari tombol X di dalam stack
+    const hasClose = Array.from(stack.querySelectorAll("button,a,div")).some(x => {
+      if (!isVisible(x)) return false;
+      const t = (x.textContent || "").trim();
+      return t === "×" || t === "X";
+    });
+    return (many && tall) || hasClose;
   }
 
   function attachRedirect(btn){
@@ -172,64 +179,39 @@
     }, true);
   }
 
-  function setup(wrap){
-    let toggleBtn = findFirst(TOGGLE_SELECTORS) || autoFindToggle();
+  function clamp(n,min,max){ return Math.max(min, Math.min(max, n)); }
 
-    const sync = () => {
-      if (!toggleBtn || !document.contains(toggleBtn)) {
-        toggleBtn = findFirst(TOGGLE_SELECTORS) || autoFindToggle();
-      }
+  function placeBetweenDownloadAndHamburger(wrap, downloadBtn, hamburgerBtn){
+    const dr = downloadBtn.getBoundingClientRect();
+    const hr = hamburgerBtn.getBoundingClientRect();
 
-      // kalau belum ketemu toggle, biarkan fixed di kiri bawah
-      if (!toggleBtn){
-        moveToBodyFixed(wrap);
-        wrap.classList.remove("hidden");
-        wrap.style.left = "16px";
-        wrap.style.top  = "65vh";
-        return;
-      }
+    // X center align mengikuti download/hamburger
+    const left = (hr.left + hr.width/2) - (BTN_SIZE/2);
 
-      const open = isOpenState(toggleBtn);
+    // Y: tepat DI BAWAH download, tapi tidak nabrak hamburger
+    let top = dr.bottom + GAP;
 
-      if (open) {
-        // OPEN => tempel ke stack (ikut naik)
-        const ok = moveToStack(wrap);
-        wrap.classList.remove("hidden");
-        if (!ok){
-          // kalau host belum ketemu, minimal hide (biar gak ketimpa)
-          wrap.classList.add("hidden");
-        }
-      } else {
-        // CLOSE => balik ke fixed dekat tombol biru
-        moveToBodyFixed(wrap);
-        placeFixedNearToggle(wrap, toggleBtn);
-        wrap.classList.remove("hidden");
-      }
-    };
+    // kalau terlalu dekat hamburger, geser jadi di atas hamburger
+    const maxTop = hr.top - GAP - BTN_SIZE;
+    top = Math.min(top, maxTop);
 
-    // initial
-    sync();
+    // clamp layar
+    wrap.style.left = clamp(left, 6, window.innerWidth - BTN_SIZE - 6) + "px";
+    wrap.style.top  = clamp(top,  6, window.innerHeight - BTN_SIZE - 6) + "px";
+  }
 
-    // update event
-    window.addEventListener("resize", sync, { passive:true });
-    window.addEventListener("scroll", () => {
-      // kalau close (fixed), ikuti posisi toggle saat scroll
-      const open = toggleBtn && isOpenState(toggleBtn);
-      if (!open) sync();
-    }, { passive:true });
+  function moveToStack(wrap, stack){
+    if (!stack) return false;
+    wrap.classList.add("in-stack");
+    wrap.style.left = "auto";
+    wrap.style.top  = "auto";
+    stack.appendChild(wrap);
+    return true;
+  }
 
-    // klik toggle => tunggu UI berubah, lalu sync
-    if (toggleBtn){
-      toggleBtn.addEventListener("click", () => setTimeout(sync, 60), true);
-    }
-
-    // observer: class/aria berubah
-    const mo = new MutationObserver(() => sync());
-    mo.observe(document.body, { attributes:true, attributeFilter:["class","style"] });
-    if (toggleBtn) mo.observe(toggleBtn, { attributes:true, attributeFilter:["class","style","aria-expanded"] });
-
-    // interval fallback biar stabil walau UI aneh
-    setInterval(sync, 400);
+  function moveToBodyFixed(wrap){
+    if (wrap.parentNode !== document.body) document.body.appendChild(wrap);
+    wrap.classList.remove("in-stack");
   }
 
   function mount(){
@@ -252,9 +234,54 @@
 
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
-
     attachRedirect(btn);
-    setup(wrap);
+
+    let hamburger = null;
+    let download  = null;
+    let stack     = null;
+
+    const sync = () => {
+      // refresh tombol fixed kiri bawah
+      const fixedBtns = findFixedLeftButtons();
+      hamburger = guessHamburger(fixedBtns);
+      download  = guessDownload(fixedBtns, hamburger);
+
+      // stack container mengikuti hamburger
+      stack = findStackContainerAround(hamburger);
+
+      // kalau belum ketemu download/hamburger, jangan hilang — taruh aman kiri
+      if (!hamburger || !download) {
+        moveToBodyFixed(wrap);
+        wrap.classList.remove("hidden");
+        wrap.style.left = "16px";
+        wrap.style.top  = "65vh";
+        return;
+      }
+
+      const open = isOpen(stack);
+
+      if (open) {
+        // OPEN => ikut naik ke stack
+        const ok = moveToStack(wrap, stack);
+        wrap.classList.remove("hidden");
+        if (!ok) wrap.classList.add("hidden");
+      } else {
+        // CLOSE => balik fixed di slot dekat kotak merah (antara download & hamburger)
+        moveToBodyFixed(wrap);
+        placeBetweenDownloadAndHamburger(wrap, download, hamburger);
+        wrap.classList.remove("hidden");
+      }
+    };
+
+    // initial + menjaga stabil
+    sync();
+    window.addEventListener("resize", sync, { passive:true });
+    window.addEventListener("scroll", sync, { passive:true });
+    setInterval(sync, 350);
+
+    // observer untuk perubahan class/menu
+    const mo = new MutationObserver(() => sync());
+    mo.observe(document.body, { attributes:true, childList:true, subtree:true });
   }
 
   if (document.readyState === "loading") {
