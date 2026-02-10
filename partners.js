@@ -8,23 +8,14 @@
 
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  /* =========================================================
-     WAJIB: isi selector tombol biru (hamburger)
-     contoh paling umum:
-     - ".floating-social .toggle"
-     - "#floatingMenuBtn"
-     - ".leftbar-toggle"
-     ========================================================= */
-  const TOGGLE_SELECTOR = ""; // <-- isi ini
+  /* WAJIB: selector tombol biru (hamburger) */
+  const TOGGLE_SELECTOR = ""; // contoh: "#menuToggle", ".floating-social .toggle", ".hamburger"
 
-  /* OPTIONAL: isi selector panel/menu yang muncul saat hamburger open
-     kalau ada, script akan "sync" tampil/hilang berdasarkan kondisi open.
-  */
-  const PANEL_SELECTOR = ""; // contoh: ".floating-social.open" atau "#leftbar"
+  /* OPTIONAL: selector panel/menu yang muncul saat open (kalau ada) */
+  const PANEL_SELECTOR = ""; // contoh: ".leftbar.open" atau "#leftMenu"
 
-  const LEFT_PX = 16;
-  const DESKTOP_BOTTOM_PX = 92;
-  const MOBILE_BOTTOM_PX  = 92;
+  /* posisi tombol bulat: di atas tombol biru */
+  const OFFSET_ABOVE_TOGGLE = 72; // naik 72px dari tombol biru (ubah 60-90 sesuai perlu)
 
   if (document.getElementById(WRAP_ID)) return;
 
@@ -36,11 +27,12 @@
       z-index: 99998;
     }
 
+    /* wrap: fixed tapi posisinya DISET lewat JS biar nempel ke tombol biru */
     #${WRAP_ID}{
       position: fixed;
-      left: ${LEFT_PX}px;
-      bottom: ${DESKTOP_BOTTOM_PX}px;
-      z-index: 99999;
+      left: 16px;
+      bottom: 120px;
+      z-index: 2147483647; /* super tinggi biar gak ketimpa */
       display: grid;
       place-items: center;
       transition: opacity .18s ease, transform .18s ease;
@@ -49,13 +41,6 @@
       opacity: 0;
       transform: translateY(10px);
       pointer-events: none;
-    }
-
-    @media (max-width: 768px){
-      #${WRAP_ID}{
-        left: ${LEFT_PX}px;
-        bottom: calc(${MOBILE_BOTTOM_PX}px + env(safe-area-inset-bottom, 0px));
-      }
     }
 
     #${BTN_ID}{
@@ -99,7 +84,10 @@
       pointer-events:none;
       color:#EAF3FF;
     }
-    .mauslot-icon svg{ width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+    .mauslot-icon svg{
+      width: 22px; height: 22px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+    }
   `;
 
   const injectCSS = () => {
@@ -120,52 +108,85 @@
     return c;
   };
 
-  function attachLogic(btn){
-    btn.addEventListener("click", () => {
+  function attachRedirect(btn){
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (!REDIRECT_URL) return;
       location.href = REDIRECT_URL;
-    }, { passive: true });
+    });
   }
 
-  function setupToggleWithBlueButton(wrap){
-    if (!TOGGLE_SELECTOR) return; // tanpa selector, tidak bisa
+  function isOpenState(btnEl){
+    // kalau tombol biru punya class open/active/expanded
+    const cls = btnEl.classList;
+    if (cls.contains("open") || cls.contains("active") || cls.contains("is-open")) return true;
 
-    const hide = () => wrap.classList.add("is-hidden");
-    const show = () => wrap.classList.remove("is-hidden");
+    // kalau aria-expanded ada
+    const ae = btnEl.getAttribute("aria-expanded");
+    if (ae === "true") return true;
 
-    // Mode A (paling akurat): sync ke PANEL open/close (kalau tersedia)
-    const syncByPanel = () => {
-      if (!PANEL_SELECTOR) return false;
+    // kalau panel selector diisi, pakai itu sebagai acuan
+    if (PANEL_SELECTOR) {
       const panel = document.querySelector(PANEL_SELECTOR);
-      if (!panel) return false;
+      if (panel) {
+        const pcs = getComputedStyle(panel);
+        const visible = pcs.display !== "none" && pcs.visibility !== "hidden" && pcs.opacity !== "0";
+        if (panel.classList.contains("open") || panel.classList.contains("active") || visible) return true;
+      }
+    }
 
-      const isOpen = () => {
-        const cs = getComputedStyle(panel);
-        return panel.classList.contains("open") ||
-               panel.classList.contains("active") ||
-               (cs.display !== "none" && cs.visibility !== "hidden" && cs.opacity !== "0");
-      };
+    return false;
+  }
 
-      const apply = () => (isOpen() ? hide() : show());
-      apply();
+  function setupToggleAndAnchor(wrap){
+    if (!TOGGLE_SELECTOR) return;
 
-      const mo = new MutationObserver(apply);
-      mo.observe(panel, { attributes: true, attributeFilter: ["class","style"] });
-      return true;
+    const toggleBtn = document.querySelector(TOGGLE_SELECTOR);
+    if (!toggleBtn) return;
+
+    const placeNearToggle = () => {
+      const r = toggleBtn.getBoundingClientRect();
+      // tempel di kiri sejajar tombol biru
+      wrap.style.left = Math.max(8, r.left) + "px";
+      // taruh DI ATAS tombol biru
+      const bottomPx = Math.max(8, (window.innerHeight - r.top) + OFFSET_ABOVE_TOGGLE);
+      wrap.style.bottom = bottomPx + "px";
     };
 
-    const synced = syncByPanel();
+    const applyVisibility = () => {
+      // open => hide, close => show
+      if (isOpenState(toggleBtn)) wrap.classList.add("is-hidden");
+      else wrap.classList.remove("is-hidden");
+    };
 
-    // Mode B: toggle setiap klik tombol biru
-    // (kalau Mode A aktif, ini tetap aman, karena setelah panel berubah observer akan sync lagi)
-    document.addEventListener("click", (e) => {
-      const t = e.target;
-      const btnBlue = t && t.closest ? t.closest(TOGGLE_SELECTOR) : null;
-      if (!btnBlue) return;
+    // initial
+    placeNearToggle();
+    applyVisibility();
 
-      // toggle cepat
-      wrap.classList.toggle("is-hidden");
+    // update posisi saat scroll/resize
+    window.addEventListener("resize", () => { placeNearToggle(); applyVisibility(); }, { passive: true });
+    window.addEventListener("scroll",  () => { placeNearToggle(); }, { passive: true });
+
+    // klik tombol biru: toggle hide/show (dan posisi update)
+    toggleBtn.addEventListener("click", () => {
+      // setelah UI toggle berubah, cek lagi (kasih delay kecil)
+      setTimeout(() => {
+        placeNearToggle();
+        applyVisibility();
+      }, 30);
     }, true);
+
+    // kalau class/style berubah tanpa klik (misalnya otomatis), tetap sync
+    const mo = new MutationObserver(() => {
+      placeNearToggle();
+      applyVisibility();
+    });
+    mo.observe(toggleBtn, { attributes: true, attributeFilter: ["class","style","aria-expanded"] });
+    if (PANEL_SELECTOR) {
+      const panel = document.querySelector(PANEL_SELECTOR);
+      if (panel) mo.observe(panel, { attributes: true, attributeFilter: ["class","style"] });
+    }
   }
 
   function mount(){
@@ -191,8 +212,8 @@
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
 
-    attachLogic(btn);
-    setupToggleWithBlueButton(wrap);
+    attachRedirect(btn);
+    setupToggleAndAnchor(wrap);
   }
 
   if (document.readyState === "loading") {
