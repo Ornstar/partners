@@ -426,13 +426,13 @@
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
     wrap.innerHTML = `
-      <button id="${BTN_ID}" class="ready" type="button" aria-label="PARTNERS MAUSLOT">
+      <button id="${BTN_ID}" class="ready" type="button" aria-label="REKAN KAMI">
         <div class="mauslot-msg mauslot-submit">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 12.2">
             <polyline stroke="currentColor" points="2,7.1 6.5,11.1 11,7.1 "/>
             <line stroke="currentColor" x1="6.5" y1="1.2" x2="6.5" y2="10.3"/>
           </svg>
-          <span class="mauslot-text">PARTNERS MAUSLOT</span>
+          <span class="mauslot-text">REKAN KAMI</span>
         </div>
 
         <div class="mauslot-msg mauslot-loading">
