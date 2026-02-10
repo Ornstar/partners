@@ -2,37 +2,51 @@
   "use strict";
 
   const BTN_ID    = "mauslotSubmitBtn";
-  const CANVAS_ID = "mauslotPowderCanvas";
   const WRAP_ID   = "mauslotFloatingBtnWrap";
   const STYLE_ID  = "mauslotFloatingBtnStyles";
 
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  /* WAJIB: selector tombol biru (hamburger) */
-  const TOGGLE_SELECTOR = ""; // contoh: "#menuToggle", ".floating-social .toggle", ".hamburger"
+  /* =========================================================
+     1) ISI SELECTOR DI SINI (kalau tahu)
+     - urutkan dari paling yakin
+     - boleh kosong, nanti auto-detect
+  ========================================================= */
+  const TOGGLE_SELECTORS = [
+    // "#menuToggle",
+    // ".hamburger",
+    // ".leftbar-toggle",
+    // ".floating-social .toggle",
+  ];
 
-  /* OPTIONAL: selector panel/menu yang muncul saat open (kalau ada) */
-  const PANEL_SELECTOR = ""; // contoh: ".leftbar.open" atau "#leftMenu"
+  /* OPTIONAL: kalau ada panel/menu yang muncul saat open (lebih akurat)
+     isi selector panelnya (boleh kosong)
+  */
+  const PANEL_SELECTORS = [
+    // "#leftMenu",
+    // ".leftbar",
+    // ".side-float",
+    // ".floating-social",
+  ];
 
-  /* posisi tombol bulat: di atas tombol biru */
-  const OFFSET_ABOVE_TOGGLE = 72; // naik 72px dari tombol biru (ubah 60-90 sesuai perlu)
+  /* =========================================================
+     2) SET POSISI
+  ========================================================= */
+  const GAP_ABOVE_TOGGLE = 12;   // jarak antar tombol (px)
+  const BTN_SIZE = 56;          // ukuran tombol bulat
+
+  /* ========================================================= */
 
   if (document.getElementById(WRAP_ID)) return;
 
   const css = `
-    #${CANVAS_ID}{
-      position: fixed; inset: 0;
-      width: 100%; height: 100vh;
-      pointer-events: none;
-      z-index: 99998;
-    }
-
-    /* wrap: fixed tapi posisinya DISET lewat JS biar nempel ke tombol biru */
     #${WRAP_ID}{
       position: fixed;
       left: 16px;
-      bottom: 120px;
-      z-index: 2147483647; /* super tinggi biar gak ketimpa */
+      top: 60vh;
+      z-index: 2147483647;
+      width: ${BTN_SIZE}px;
+      height: ${BTN_SIZE}px;
       display: grid;
       place-items: center;
       transition: opacity .18s ease, transform .18s ease;
@@ -44,7 +58,8 @@
     }
 
     #${BTN_ID}{
-      width: 56px; height: 56px;
+      width: ${BTN_SIZE}px;
+      height: ${BTN_SIZE}px;
       border-radius: 999px;
       border: none;
       cursor: pointer;
@@ -90,72 +105,115 @@
     }
   `;
 
-  const injectCSS = () => {
+  function injectCSS(){
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = css;
     document.head.appendChild(style);
-  };
-
-  const ensureCanvas = () => {
-    let c = document.getElementById(CANVAS_ID);
-    if (!c) {
-      c = document.createElement("canvas");
-      c.id = CANVAS_ID;
-      document.body.appendChild(c);
-    }
-    return c;
-  };
+  }
 
   function attachRedirect(btn){
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (!REDIRECT_URL) return;
-      location.href = REDIRECT_URL;
-    });
+      window.location.href = REDIRECT_URL;
+    }, true);
   }
 
-  function isOpenState(btnEl){
-    // kalau tombol biru punya class open/active/expanded
-    const cls = btnEl.classList;
-    if (cls.contains("open") || cls.contains("active") || cls.contains("is-open")) return true;
+  // cek panel kelihatan (kalau selector panel diset)
+  function anyPanelVisible(){
+    for (const sel of PANEL_SELECTORS) {
+      if (!sel) continue;
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const cs = getComputedStyle(el);
+      const visible = cs.display !== "none" && cs.visibility !== "hidden" && cs.opacity !== "0";
+      // kadang panel off-canvas display:block tapi offscreen; tetap dianggap open kalau ada class umum
+      if (visible && (el.classList.contains("open") || el.classList.contains("active") || el.classList.contains("show"))) return true;
+      if (el.classList.contains("open") || el.classList.contains("active") || el.classList.contains("show")) return true;
+    }
+    return false;
+  }
 
-    // kalau aria-expanded ada
-    const ae = btnEl.getAttribute("aria-expanded");
+  // open state dari tombol biru
+  function isOpenState(toggleBtn){
+    if (!toggleBtn) return false;
+
+    const cls = toggleBtn.classList;
+    if (cls.contains("open") || cls.contains("active") || cls.contains("is-open") || cls.contains("show")) return true;
+
+    const ae = toggleBtn.getAttribute("aria-expanded");
     if (ae === "true") return true;
 
-    // kalau panel selector diisi, pakai itu sebagai acuan
-    if (PANEL_SELECTOR) {
-      const panel = document.querySelector(PANEL_SELECTOR);
-      if (panel) {
-        const pcs = getComputedStyle(panel);
-        const visible = pcs.display !== "none" && pcs.visibility !== "hidden" && pcs.opacity !== "0";
-        if (panel.classList.contains("open") || panel.classList.contains("active") || visible) return true;
-      }
-    }
+    // fallback: cek panel
+    if (anyPanelVisible()) return true;
 
     return false;
   }
 
-  function setupToggleAndAnchor(wrap){
-    if (!TOGGLE_SELECTOR) return;
+  // cari tombol biru: 1) dari selector 2) auto-detect elemen fixed kiri bawah
+  function findToggleButton(){
+    // 1) manual selectors
+    for (const sel of TOGGLE_SELECTORS) {
+      if (!sel) continue;
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
 
-    const toggleBtn = document.querySelector(TOGGLE_SELECTOR);
-    if (!toggleBtn) return;
+    // 2) auto detect: cari element fixed di kiri bawah dengan ukuran kecil (mirip hamburger)
+    const candidates = Array.from(document.querySelectorAll("button, a, div"))
+      .filter(el => {
+        const cs = getComputedStyle(el);
+        if (cs.position !== "fixed") return false;
+        const r = el.getBoundingClientRect();
+        if (r.width < 35 || r.width > 90) return false;
+        if (r.height < 35 || r.height > 90) return false;
+        if (r.left > 40) return false;                         // dekat kiri
+        if ((window.innerHeight - r.bottom) > 140) return false; // dekat bawah
+        // seringnya ada cursor pointer / role button
+        const role = (el.getAttribute("role") || "").toLowerCase();
+        const clickable = cs.cursor === "pointer" || el.tagName === "BUTTON" || el.tagName === "A" || role === "button";
+        if (!clickable) return false;
+        return true;
+      });
+
+    // pilih yang paling “bawah”
+    candidates.sort((a,b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
+    return candidates[0] || null;
+  }
+
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+  function setupAnchorAndVisibility(wrap){
+    let toggleBtn = null;
 
     const placeNearToggle = () => {
+      if (!toggleBtn) toggleBtn = findToggleButton();
+
+      // kalau belum ketemu juga, pakai fallback posisi (tidak hide/show)
+      if (!toggleBtn) {
+        wrap.style.left = "16px";
+        wrap.style.top = "65vh";
+        wrap.classList.remove("is-hidden");
+        return;
+      }
+
       const r = toggleBtn.getBoundingClientRect();
-      // tempel di kiri sejajar tombol biru
-      wrap.style.left = Math.max(8, r.left) + "px";
-      // taruh DI ATAS tombol biru
-      const bottomPx = Math.max(8, (window.innerHeight - r.top) + OFFSET_ABOVE_TOGGLE);
-      wrap.style.bottom = bottomPx + "px";
+
+      // sejajarkan center tombol bulat dengan center tombol biru
+      const left = r.left + (r.width / 2) - (BTN_SIZE / 2);
+      const top  = (r.top - GAP_ABOVE_TOGGLE - BTN_SIZE);
+
+      wrap.style.left = clamp(left, 6, window.innerWidth - BTN_SIZE - 6) + "px";
+      wrap.style.top  = clamp(top, 6, window.innerHeight - BTN_SIZE - 6) + "px";
     };
 
     const applyVisibility = () => {
-      // open => hide, close => show
+      if (!toggleBtn) toggleBtn = findToggleButton();
+      if (!toggleBtn) { wrap.classList.remove("is-hidden"); return; }
+
       if (isOpenState(toggleBtn)) wrap.classList.add("is-hidden");
       else wrap.classList.remove("is-hidden");
     };
@@ -164,34 +222,53 @@
     placeNearToggle();
     applyVisibility();
 
-    // update posisi saat scroll/resize
+    // update saat resize/scroll
     window.addEventListener("resize", () => { placeNearToggle(); applyVisibility(); }, { passive: true });
     window.addEventListener("scroll",  () => { placeNearToggle(); }, { passive: true });
 
-    // klik tombol biru: toggle hide/show (dan posisi update)
-    toggleBtn.addEventListener("click", () => {
-      // setelah UI toggle berubah, cek lagi (kasih delay kecil)
-      setTimeout(() => {
-        placeNearToggle();
-        applyVisibility();
-      }, 30);
-    }, true);
+    // klik toggle: setelah UI berubah, cek lagi
+    const hookToggleClick = () => {
+      if (!toggleBtn) return;
+      toggleBtn.addEventListener("click", () => {
+        setTimeout(() => { placeNearToggle(); applyVisibility(); }, 50);
+      }, true);
+    };
+    hookToggleClick();
 
-    // kalau class/style berubah tanpa klik (misalnya otomatis), tetap sync
+    // mutation observer: kalau class/aria berubah
     const mo = new MutationObserver(() => {
       placeNearToggle();
       applyVisibility();
     });
-    mo.observe(toggleBtn, { attributes: true, attributeFilter: ["class","style","aria-expanded"] });
-    if (PANEL_SELECTOR) {
-      const panel = document.querySelector(PANEL_SELECTOR);
-      if (panel) mo.observe(panel, { attributes: true, attributeFilter: ["class","style"] });
+
+    // observe body/html juga (kadang state open ditaruh di body class)
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class","style"] });
+    mo.observe(document.body, { attributes: true, attributeFilter: ["class","style"] });
+
+    // observe toggle/panel kalau ada
+    const obsTargets = [];
+    if (toggleBtn) obsTargets.push(toggleBtn);
+    for (const sel of PANEL_SELECTORS) {
+      if (!sel) continue;
+      const p = document.querySelector(sel);
+      if (p) obsTargets.push(p);
     }
+    obsTargets.forEach(t => mo.observe(t, { attributes: true, attributeFilter: ["class","style","aria-expanded"] }));
+
+    // fallback: cek berkala (biar pasti sync walau UI aneh)
+    setInterval(() => {
+      // refresh toggle kalau DOM berubah
+      if (!toggleBtn || !document.contains(toggleBtn)) {
+        toggleBtn = findToggleButton();
+        hookToggleClick();
+      }
+      placeNearToggle();
+      applyVisibility();
+    }, 400);
   }
 
   function mount(){
     injectCSS();
-    ensureCanvas();
 
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
@@ -207,13 +284,14 @@
         </div>
       </button>
     `;
+
     document.body.appendChild(wrap);
 
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
 
     attachRedirect(btn);
-    setupToggleAndAnchor(wrap);
+    setupAnchorAndVisibility(wrap);
   }
 
   if (document.readyState === "loading") {
