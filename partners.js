@@ -1,4 +1,3 @@
-<script>
 (() => {
   "use strict";
 
@@ -400,4 +399,3 @@
     mount();
   }
 })();
-</script>
