@@ -2,29 +2,30 @@
 (() => {
   "use strict";
 
-  const BTN_ID   = "mauslotSubmitBtn";
-  const CANVAS_ID= "mauslotPowderCanvas";
-  const WRAP_ID  = "mauslotFloatingBtnWrap";
-  const STYLE_ID = "mauslotFloatingBtnStyles";
+  const BTN_ID    = "mauslotSubmitBtn";
+  const CANVAS_ID = "mauslotPowderCanvas";
+  const WRAP_ID   = "mauslotFloatingBtnWrap";
+  const STYLE_ID  = "mauslotFloatingBtnStyles";
 
   /* ==== SET LINK TUJUAN DI SINI ==== */
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  /* ==== (OPSIONAL) AGAR NEMPEL DI BAR KIRI DAN IKUT NAIK SAAT EXPAND ====
-     Isi selector container bar kiri kak.
-     Contoh (misal): ".floating-social", "#sticky-leftbar", ".side-float"
-     Kalau belum tahu, biarkan "" (kosong) -> tetap muncul fixed kiri bawah.
+  /* ==== NEMPEL KE BAR KIRI (ISI SELECTOR CONTAINER BAR KIRI) ====
+     Contoh: ".floating-social" atau "#sticky-leftbar" atau ".side-float"
   */
-  const STACK_SELECTOR = "";  // <-- isi ini kalau mau ikut naik bar kiri
+  const STACK_SELECTOR = "";  // <-- WAJIB diisi kalau mau ikut naik bar kiri
 
-  /* ==== OFFSET POSISI ==== */
-  const DESKTOP_LEFT = 18;
+  /* ==== OFFSET POSISI (MODE FIXED) ==== */
+  const DESKTOP_LEFT   = 18;
   const DESKTOP_BOTTOM = 18;
 
-  // Ini yang bikin gak nutup tombol hijau (bottom nav) di mobile
-  const MOBILE_BOTTOM = 118; // kalau masih nabrak, naikin jadi 130-150
+  /* MOBILE: naikin biar gak nutup bottom nav (hijau) */
+  const MOBILE_BOTTOM  = 118; // kalau masih nabrak, naikin jadi 130-160
 
-  // Cegah double-mount
+  /* MODE NEMPEL (ikut bar kiri) */
+  const STACK_GAP_TOP = 10;   // jarak dari tombol di atas (biar masuk “barisan” rapi)
+  const STACK_ORDER   = 999;  // kalau parent pakai flex/column, bisa bantu urutan
+
   if (document.getElementById(WRAP_ID)) return;
 
   const css = `
@@ -37,7 +38,7 @@
       z-index: 99998;
     }
 
-    /* WRAP default: kiri bawah (kotak merah) */
+    /* default: fixed kiri bawah */
     #${WRAP_ID}{
       position: fixed;
       left: ${DESKTOP_LEFT}px;
@@ -47,7 +48,6 @@
       place-items: center;
     }
 
-    /* MOBILE: naikin supaya tidak nutup bottom nav (hijau) */
     @media (max-width: 768px){
       #${WRAP_ID}{
         left: ${DESKTOP_LEFT}px !important;
@@ -77,7 +77,6 @@
       100%{background-position:0% 50%}
     }
 
-    /* lingkaran gradient */
     #${BTN_ID}::before{
       content:'';
       position:absolute;
@@ -98,7 +97,6 @@
       filter: brightness(1.05);
     }
 
-    /* isi icon */
     .mauslot-icon{
       position:absolute;
       inset:0;
@@ -107,33 +105,16 @@
       z-index:1;
       pointer-events:none;
       color:#EAF3FF;
+      transition: opacity .15s ease;
     }
+    #${BTN_ID}.loading .mauslot-icon{ opacity: 0; }
+
     .mauslot-icon svg{
       width: 22px;
       height: 22px;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
     }
 
-    /* Badge kecil optional */
-    .mauslot-badge{
-      position:absolute;
-      right:-2px;
-      top:-2px;
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: rgba(47,184,255,.95);
-      box-shadow: 0 0 0 2px rgba(5,11,28,.9);
-      display:none; /* kalau mau tampilkan, ganti jadi grid */
-      place-items:center;
-      font-size: 11px;
-      font-weight: 900;
-      color:#07163A;
-      z-index:2;
-      pointer-events:none;
-    }
-
-    /* ====== powder loader kecil (tetap ada, tapi ringkas) ====== */
     .mauslot-loading{
       position:absolute;
       inset:0;
@@ -322,7 +303,6 @@
     const doRedirect = () => {
       if (!REDIRECT_URL) return;
       window.location.href = REDIRECT_URL;
-      // window.open(REDIRECT_URL, "_blank");
     };
 
     btn.addEventListener("click", () => {
@@ -339,18 +319,34 @@
     }, { passive: true });
   }
 
-  function tryAttachToLeftStack(wrap){
+  function attachToLeftStackWithRetry(wrap){
     if (!STACK_SELECTOR) return false;
-    const host = document.querySelector(STACK_SELECTOR);
-    if (!host) return false;
 
-    // ikut “barisan” menu kiri
-    wrap.style.position = "static";
-    wrap.style.left = "auto";
-    wrap.style.bottom = "auto";
-    wrap.style.zIndex = "99999";
-    host.appendChild(wrap);
-    return true;
+    let tries = 0;
+    const maxTries = 30; // ~6 detik
+    const timer = setInterval(() => {
+      tries++;
+
+      const host = document.querySelector(STACK_SELECTOR);
+      if (host) {
+        clearInterval(timer);
+
+        // ikut bar kiri (naik turun bareng tombol lain)
+        wrap.style.position = "static";
+        wrap.style.left = "auto";
+        wrap.style.bottom = "auto";
+        wrap.style.transform = "none";
+        wrap.style.marginTop = STACK_GAP_TOP + "px";
+        wrap.style.order = String(STACK_ORDER);
+        wrap.style.zIndex = "99999";
+
+        host.appendChild(wrap);
+      }
+
+      if (tries >= maxTries) clearInterval(timer);
+    }, 200);
+
+    return true; // kita sudah jalankan retry
   }
 
   function mount(){
@@ -363,15 +359,12 @@
     wrap.innerHTML = `
       <button id="${BTN_ID}" type="button" aria-label="REKAN KAMI" title="REKAN KAMI">
         <div class="mauslot-icon" aria-hidden="true">
-          <!-- icon panah / download style -->
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
             <path d="M12 3v10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
-
-        <div class="mauslot-badge">1</div>
 
         <div class="mauslot-loading" aria-hidden="true">
           <div class="mauslot-powder">
@@ -385,9 +378,14 @@
       </button>
     `;
 
-    // kalau bisa, tempel ke bar kiri (biar ikut naik saat expand)
-    const attached = tryAttachToLeftStack(wrap);
-    if (!attached) document.body.appendChild(wrap);
+    // 1) coba tempel ke bar kiri (retry), kalau tidak pakai selector -> fallback fixed
+    const isTryingAttach = attachToLeftStackWithRetry(wrap);
+    if (!isTryingAttach) {
+      document.body.appendChild(wrap);
+    } else {
+      // sementara tampil dulu sebagai fixed biar gak “hilang”
+      document.body.appendChild(wrap);
+    }
 
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
