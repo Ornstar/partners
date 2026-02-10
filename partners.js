@@ -6,59 +6,57 @@
   const WRAP_ID   = "mauslotFloatingBtnWrap";
   const STYLE_ID  = "mauslotFloatingBtnStyles";
 
-  /* ==== SET LINK TUJUAN DI SINI ==== */
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  /* ==== NEMPEL KE BAR KIRI (ISI SELECTOR CONTAINER BAR KIRI) ====
-     Contoh: ".floating-social" atau "#sticky-leftbar" atau ".side-float"
-  */
-  const STACK_SELECTOR = "";  // <-- WAJIB diisi kalau mau ikut naik bar kiri
+  /* =========================================================
+     WAJIB DISET kalau mau benar2 ikut tombol bawah:
+     - TOGGLE_SELECTOR: selector tombol hamburger/menu biru
+     - PANEL_SELECTOR : selector panel/menu kiri yang muncul (optional)
+     ========================================================= */
+  const TOGGLE_SELECTOR = ""; // contoh: ".menu-toggle" atau "#hamburgerBtn"
+  const PANEL_SELECTOR  = ""; // contoh: ".left-drawer" atau "#sideMenu"
 
-  /* ==== OFFSET POSISI (MODE FIXED) ==== */
-  const DESKTOP_LEFT   = 18;
-  const DESKTOP_BOTTOM = 18;
+  /* Posisi tombol: tepat di kotak merah (di atas tombol menu biru) */
+  const LEFT_PX = 16;
+  const DESKTOP_BOTTOM_PX = 92;  // naikkan/turunkan (kotak merah desktop)
+  const MOBILE_BOTTOM_PX  = 92;  // naikkan/turunkan (kotak merah mobile)
 
-  /* MOBILE: naikin biar gak nutup bottom nav (hijau) */
-  const MOBILE_BOTTOM  = 118; // kalau masih nabrak, naikin jadi 130-160
-
-  /* MODE NEMPEL (ikut bar kiri) */
-  const STACK_GAP_TOP = 10;   // jarak dari tombol di atas (biar masuk “barisan” rapi)
-  const STACK_ORDER   = 999;  // kalau parent pakai flex/column, bisa bantu urutan
-
+  // Cegah double mount
   if (document.getElementById(WRAP_ID)) return;
 
   const css = `
     #${CANVAS_ID}{
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100vh;
+      position: fixed; inset: 0;
+      width: 100%; height: 100vh;
       pointer-events: none;
       z-index: 99998;
     }
 
-    /* default: fixed kiri bawah */
     #${WRAP_ID}{
       position: fixed;
-      left: ${DESKTOP_LEFT}px;
-      bottom: ${DESKTOP_BOTTOM}px;
+      left: ${LEFT_PX}px;
+      bottom: ${DESKTOP_BOTTOM_PX}px;
       z-index: 99999;
       display: grid;
       place-items: center;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    #${WRAP_ID}.is-hidden{
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
     }
 
     @media (max-width: 768px){
       #${WRAP_ID}{
-        left: ${DESKTOP_LEFT}px !important;
-        bottom: calc(${MOBILE_BOTTOM}px + env(safe-area-inset-bottom, 0px)) !important;
-        transform: none !important;
+        left: ${LEFT_PX}px;
+        bottom: calc(${MOBILE_BOTTOM_PX}px + env(safe-area-inset-bottom, 0px));
       }
     }
 
-    /* ===== BUTTON BULAT ===== */
+    /* BUTTON BULAT */
     #${BTN_ID}{
-      width: 56px;
-      height: 56px;
+      width: 56px; height: 56px;
       border-radius: 999px;
       border: none;
       cursor: pointer;
@@ -78,8 +76,7 @@
 
     #${BTN_ID}::before{
       content:'';
-      position:absolute;
-      inset:0;
+      position:absolute; inset:0;
       border-radius: 999px;
       background: linear-gradient(90deg,#050B1C,#07163A,#0A2C6D,#0B4DB2,#1A7BFF,#2FB8FF,#0B4DB2,#07163A);
       background-size: 700% 700%;
@@ -90,37 +87,24 @@
         0 10px 26px rgba(0,0,0,.35);
       transition: transform .15s ease, filter .15s ease;
     }
-
-    #${BTN_ID}:active::before{
-      transform: scale(.96);
-      filter: brightness(1.05);
-    }
+    #${BTN_ID}:active::before{ transform: scale(.96); filter: brightness(1.05); }
 
     .mauslot-icon{
-      position:absolute;
-      inset:0;
-      display:grid;
-      place-items:center;
+      position:absolute; inset:0;
+      display:grid; place-items:center;
       z-index:1;
       pointer-events:none;
       color:#EAF3FF;
       transition: opacity .15s ease;
     }
-    #${BTN_ID}.loading .mauslot-icon{ opacity: 0; }
+    #${BTN_ID}.loading .mauslot-icon{ opacity:0; }
 
-    .mauslot-icon svg{
-      width: 22px;
-      height: 22px;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
-    }
+    .mauslot-icon svg{ width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
 
     .mauslot-loading{
-      position:absolute;
-      inset:0;
-      display:grid;
-      place-items:center;
-      opacity:0;
-      z-index:2;
+      position:absolute; inset:0;
+      display:grid; place-items:center;
+      opacity:0; z-index:2;
       pointer-events:none;
       transition: opacity .2s ease;
     }
@@ -171,17 +155,13 @@
     let confetti = [];
     let sequins = [];
 
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
+    const resize = () => { canvas.width = innerWidth; canvas.height = innerHeight; };
     resize();
-    window.addEventListener("resize", resize, { passive: true });
+    addEventListener("resize", resize, { passive: true });
 
-    const confettiCount = 110, sequinCount = 60;
+    const confettiCount = 90, sequinCount = 45;
     const gravityConfetti = 0.25, gravitySequins = 0.45;
     const dragConfetti = 0.05, dragSequins = 0.02;
-    const terminalVelocity = 3;
 
     const colors = [
       { front:"#0B4DB2", back:"#07163A" },
@@ -189,16 +169,7 @@
       { front:"#2FB8FF", back:"#0B4DB2" },
       { front:"#0A2C6D", back:"#050B1C" }
     ];
-
-    const randomRange = (min, max) => Math.random() * (max - min) + min;
-
-    const initVelocity = (xRange, yRange) => {
-      const x = randomRange(xRange[0], xRange[1]);
-      const range = yRange[1] - yRange[0] + 1;
-      let y = yRange[1] - Math.abs(randomRange(0, range) + randomRange(0, range) - range);
-      return { x, y: -y };
-    };
-
+    const rr = (a,b)=>Math.random()*(b-a)+a;
     const hexToRgb = (hex) => {
       hex = String(hex).replace("#", "");
       const r = parseInt(hex.slice(0,2), 16);
@@ -208,86 +179,56 @@
     };
 
     function Confetto(){
-      this.color = colors[Math.floor(randomRange(0, colors.length))];
-      this.isCircular = Math.random() < 0.7;
-      this.dimensions = this.isCircular
-        ? { x: randomRange(5,9), y: randomRange(5,9) }
-        : { x: randomRange(4,10), y: randomRange(3,8) };
-
+      this.color = colors[Math.floor(rr(0, colors.length))];
+      this.r = rr(2.5,4.5);
       const rect = btn.getBoundingClientRect();
-      this.position = {
-        x: randomRange(rect.left + rect.width*0.25, rect.left + rect.width*0.75),
-        y: randomRange(rect.top + rect.height*0.25, rect.top + rect.height*1.2),
-      };
-      this.rotation = randomRange(0, 2*Math.PI);
-      this.scale = { x:1, y:1 };
-      this.opacity = randomRange(0.7, 1.0);
-      this.velocity = initVelocity([-10,10], [10,14]);
-      this.randomModifier = randomRange(0,99);
+      this.x = rr(rect.left, rect.right);
+      this.y = rr(rect.top, rect.bottom);
+      this.vx = rr(-8,8);
+      this.vy = rr(-12,-8);
+      this.o = rr(0.7,1);
     }
-    Confetto.prototype.update = function(){
-      this.velocity.x -= this.velocity.x * dragConfetti;
-      this.velocity.y = Math.min(this.velocity.y + gravityConfetti, terminalVelocity);
-      this.position.x += this.velocity.x;
-      this.position.y += this.velocity.y;
-      this.scale.y = Math.max(0.1, Math.cos((this.position.y + this.randomModifier)*0.09));
-      this.opacity = Math.max(0, this.opacity - 0.008);
-    };
-
     function Sequin(){
       const rect = btn.getBoundingClientRect();
-      this.color = colors[Math.floor(randomRange(0,colors.length))].front;
-      this.radius = randomRange(1,3);
-      this.position = {
-        x: randomRange(rect.left + rect.width*0.25, rect.left + rect.width*0.75),
-        y: randomRange(rect.top + rect.height*0.25, rect.top + rect.height*1.2),
-      };
-      this.velocity = { x: randomRange(-7,7), y: randomRange(-10,-13) };
-      this.opacity = randomRange(0.8,1.0);
+      this.c = colors[Math.floor(rr(0, colors.length))].front;
+      this.r = rr(1,2.5);
+      this.x = rr(rect.left, rect.right);
+      this.y = rr(rect.top, rect.bottom);
+      this.vx = rr(-6,6);
+      this.vy = rr(-10,-7);
+      this.o = rr(0.7,1);
     }
-    Sequin.prototype.update = function(){
-      this.velocity.x -= this.velocity.x * dragSequins;
-      this.velocity.y += gravitySequins;
-      this.position.x += this.velocity.x;
-      this.position.y += this.velocity.y;
-      this.opacity = Math.max(0, this.opacity - 0.015);
-    };
 
     const burst = () => {
       for (let i=0;i<confettiCount;i++) confetti.push(new Confetto());
-      for (let i=0;i<sequinCount;i++) sequins.push(new Sequin());
+      for (let i=0;i<sequinCount;i++)  sequins.push(new Sequin());
     };
 
     const render = () => {
       ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      confetti.forEach(c => {
-        const w = c.dimensions.x * c.scale.x;
-        ctx.save();
-        ctx.translate(c.position.x, c.position.y);
-        ctx.rotate(c.rotation);
-        c.update();
-        const rgb = hexToRgb(c.scale.y > 0 ? c.color.front : c.color.back);
-        ctx.fillStyle = `rgba(${rgb}, ${c.opacity})`;
-        if (c.isCircular){
-          ctx.beginPath(); ctx.arc(0,0,w/2,0,2*Math.PI); ctx.fill();
-        } else {
-          ctx.fillRect(-w/2,-w/3,w,w*0.7);
-        }
-        ctx.restore();
+      confetti.forEach(p=>{
+        p.vx -= p.vx*dragConfetti;
+        p.vy += gravityConfetti;
+        p.x += p.vx; p.y += p.vy;
+        p.o = Math.max(0, p.o - 0.01);
+
+        ctx.fillStyle = `rgba(${hexToRgb(p.color.front)}, ${p.o})`;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
       });
 
-      sequins.forEach(s => {
-        ctx.save();
-        ctx.translate(s.position.x, s.position.y);
-        s.update();
-        ctx.fillStyle = `rgba(${hexToRgb(s.color)}, ${s.opacity})`;
-        ctx.beginPath(); ctx.arc(0,0,s.radius,0,2*Math.PI); ctx.fill();
-        ctx.restore();
+      sequins.forEach(s=>{
+        s.vx -= s.vx*dragSequins;
+        s.vy += gravitySequins;
+        s.x += s.vx; s.y += s.vy;
+        s.o = Math.max(0, s.o - 0.015);
+
+        ctx.fillStyle = `rgba(${hexToRgb(s.c)}, ${s.o})`;
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
       });
 
-      confetti = confetti.filter(c => c.position.y < canvas.height && c.opacity > 0.1);
-      sequins  = sequins.filter(s => s.position.y < canvas.height && s.opacity > 0.1);
+      confetti = confetti.filter(p=>p.o>0.05 && p.y<canvas.height+30);
+      sequins  = sequins.filter(p=>p.o>0.05 && p.y<canvas.height+30);
 
       requestAnimationFrame(render);
     };
@@ -298,54 +239,79 @@
 
   function attachLogic(btn, powder){
     let disabled = false;
-
-    const doRedirect = () => {
-      if (!REDIRECT_URL) return;
-      window.location.href = REDIRECT_URL;
-    };
+    const doRedirect = () => { if (REDIRECT_URL) location.href = REDIRECT_URL; };
 
     btn.addEventListener("click", () => {
       if (disabled) return;
       disabled = true;
-
       btn.classList.add("loading");
 
       setTimeout(() => {
-        try { powder && powder.burst && powder.burst(); } catch(_){}
+        try { powder?.burst?.(); } catch(_){}
         setTimeout(doRedirect, 650);
-      }, 650);
-
+      }, 450);
     }, { passive: true });
   }
 
-  function attachToLeftStackWithRetry(wrap){
-    if (!STACK_SELECTOR) return false;
+  /* ===============================
+     HIDE/SHOW saat hamburger diklik
+     =============================== */
+  function setupAutoHide(wrap){
+    const hide = () => wrap.classList.add("is-hidden");
+    const show = () => wrap.classList.remove("is-hidden");
 
-    let tries = 0;
-    const maxTries = 30; // ~6 detik
-    const timer = setInterval(() => {
-      tries++;
+    // 1) Kalau ada selector tombol hamburger: paling akurat
+    if (TOGGLE_SELECTOR) {
+      document.addEventListener("click", (e) => {
+        const t = e.target;
+        if (t && t.closest && t.closest(TOGGLE_SELECTOR)) {
+          // toggle: kalau lagi tampil -> hide; kalau hidden -> show
+          wrap.classList.toggle("is-hidden");
+        }
+      }, true);
+    }
 
-      const host = document.querySelector(STACK_SELECTOR);
-      if (host) {
-        clearInterval(timer);
+    // 2) Kalau ada selector panel: pantau class/style berubah (open/active)
+    if (PANEL_SELECTOR) {
+      const panel = document.querySelector(PANEL_SELECTOR);
+      if (panel) {
+        const isOpen = () => {
+          const cs = getComputedStyle(panel);
+          return panel.classList.contains("open") ||
+                 panel.classList.contains("active") ||
+                 cs.display !== "none" && cs.visibility !== "hidden" && cs.opacity !== "0";
+        };
 
-        // ikut bar kiri (naik turun bareng tombol lain)
-        wrap.style.position = "static";
-        wrap.style.left = "auto";
-        wrap.style.bottom = "auto";
-        wrap.style.transform = "none";
-        wrap.style.marginTop = STACK_GAP_TOP + "px";
-        wrap.style.order = String(STACK_ORDER);
-        wrap.style.zIndex = "99999";
+        // cek awal + observer
+        const sync = () => (isOpen() ? hide() : show());
+        sync();
 
-        host.appendChild(wrap);
+        const mo = new MutationObserver(sync);
+        mo.observe(panel, { attributes: true, attributeFilter: ["class", "style"] });
       }
+    }
 
-      if (tries >= maxTries) clearInterval(timer);
-    }, 200);
+    // 3) Fallback: kalau klik area tombol menu biru (kiri bawah) -> hide
+    // (aman kalau selector belum ketemu)
+    document.addEventListener("click", (e) => {
+      const x = e.clientX, y = e.clientY;
+      const h = innerHeight;
+      // area kiri bawah sekitar tombol biru (kira-kira)
+      const inZone = x <= 90 && y >= (h - 140);
+      if (inZone) hide();
+    }, true);
 
-    return true; // kita sudah jalankan retry
+    // kalau user scroll/klik di luar, tampil lagi (opsional)
+    document.addEventListener("click", (e) => {
+      const t = e.target;
+      // kalau klik bukan area kiri bawah dan bukan tombol kita, munculin lagi
+      if (!t.closest || (!t.closest(`#${WRAP_ID}`))) {
+        const x = e.clientX, y = e.clientY;
+        const h = innerHeight;
+        const inZone = x <= 90 && y >= (h - 140);
+        if (!inZone) show();
+      }
+    }, true);
   }
 
   function mount(){
@@ -354,7 +320,6 @@
 
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
-
     wrap.innerHTML = `
       <button id="${BTN_ID}" type="button" aria-label="REKAN KAMI" title="REKAN KAMI">
         <div class="mauslot-icon" aria-hidden="true">
@@ -376,21 +341,14 @@
         </div>
       </button>
     `;
-
-    // 1) coba tempel ke bar kiri (retry), kalau tidak pakai selector -> fallback fixed
-    const isTryingAttach = attachToLeftStackWithRetry(wrap);
-    if (!isTryingAttach) {
-      document.body.appendChild(wrap);
-    } else {
-      // sementara tampil dulu sebagai fixed biar gak “hilang”
-      document.body.appendChild(wrap);
-    }
+    document.body.appendChild(wrap);
 
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
 
     const powder = initPowder(btn);
     attachLogic(btn, powder);
+    setupAutoHide(wrap);
   }
 
   if (document.readyState === "loading") {
