@@ -9,19 +9,23 @@
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
   /* =========================================================
-     WAJIB DISET kalau mau benar2 ikut tombol bawah:
-     - TOGGLE_SELECTOR: selector tombol hamburger/menu biru
-     - PANEL_SELECTOR : selector panel/menu kiri yang muncul (optional)
+     WAJIB: isi selector tombol biru (hamburger)
+     contoh paling umum:
+     - ".floating-social .toggle"
+     - "#floatingMenuBtn"
+     - ".leftbar-toggle"
      ========================================================= */
-  const TOGGLE_SELECTOR = ""; // contoh: ".menu-toggle" atau "#hamburgerBtn"
-  const PANEL_SELECTOR  = ""; // contoh: ".left-drawer" atau "#sideMenu"
+  const TOGGLE_SELECTOR = ""; // <-- isi ini
 
-  /* Posisi tombol: tepat di kotak merah (di atas tombol menu biru) */
+  /* OPTIONAL: isi selector panel/menu yang muncul saat hamburger open
+     kalau ada, script akan "sync" tampil/hilang berdasarkan kondisi open.
+  */
+  const PANEL_SELECTOR = ""; // contoh: ".floating-social.open" atau "#leftbar"
+
   const LEFT_PX = 16;
-  const DESKTOP_BOTTOM_PX = 92;  // naikkan/turunkan (kotak merah desktop)
-  const MOBILE_BOTTOM_PX  = 92;  // naikkan/turunkan (kotak merah mobile)
+  const DESKTOP_BOTTOM_PX = 92;
+  const MOBILE_BOTTOM_PX  = 92;
 
-  // Cegah double mount
   if (document.getElementById(WRAP_ID)) return;
 
   const css = `
@@ -54,7 +58,6 @@
       }
     }
 
-    /* BUTTON BULAT */
     #${BTN_ID}{
       width: 56px; height: 56px;
       border-radius: 999px;
@@ -95,38 +98,8 @@
       z-index:1;
       pointer-events:none;
       color:#EAF3FF;
-      transition: opacity .15s ease;
     }
-    #${BTN_ID}.loading .mauslot-icon{ opacity:0; }
-
     .mauslot-icon svg{ width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
-
-    .mauslot-loading{
-      position:absolute; inset:0;
-      display:grid; place-items:center;
-      opacity:0; z-index:2;
-      pointer-events:none;
-      transition: opacity .2s ease;
-    }
-    #${BTN_ID}.loading .mauslot-loading{ opacity:1; }
-
-    .mauslot-powder{ position: relative; width: 22px; height: 22px; }
-    .mauslot-particle{
-      position:absolute; width:6px;height:6px;border-radius:50%;
-      top:8px;left:8px;
-      animation: mauslotPowder 1.1s ease-in-out infinite;
-      box-shadow: 0 0 10px rgba(90,180,255,.18);
-    }
-    @keyframes mauslotPowder{
-      0%{transform:translate(0,0) scale(1); opacity:1}
-      50%{transform:translate(var(--x),var(--y)) scale(.5); opacity:.7}
-      100%{transform:translate(0,0) scale(1); opacity:1}
-    }
-    .p1{background:#0B4DB2; animation-delay:0s;  --x:-10px; --y:-8px;}
-    .p2{background:#1A7BFF; animation-delay:.1s; --x: 10px; --y:-6px;}
-    .p3{background:#2FB8FF; animation-delay:.2s; --x:-6px;  --y:10px;}
-    .p4{background:#0A2C6D; animation-delay:.3s; --x: 8px;  --y:8px;}
-    .p5{background:#07163A; animation-delay:.4s; --x: 0px;  --y:-12px;}
   `;
 
   const injectCSS = () => {
@@ -147,170 +120,51 @@
     return c;
   };
 
-  function initPowder(btn) {
-    const canvas = ensureCanvas();
-    const ctx = canvas.getContext && canvas.getContext("2d");
-    if (!ctx) return { burst: () => {} };
-
-    let confetti = [];
-    let sequins = [];
-
-    const resize = () => { canvas.width = innerWidth; canvas.height = innerHeight; };
-    resize();
-    addEventListener("resize", resize, { passive: true });
-
-    const confettiCount = 90, sequinCount = 45;
-    const gravityConfetti = 0.25, gravitySequins = 0.45;
-    const dragConfetti = 0.05, dragSequins = 0.02;
-
-    const colors = [
-      { front:"#0B4DB2", back:"#07163A" },
-      { front:"#1A7BFF", back:"#0A2C6D" },
-      { front:"#2FB8FF", back:"#0B4DB2" },
-      { front:"#0A2C6D", back:"#050B1C" }
-    ];
-    const rr = (a,b)=>Math.random()*(b-a)+a;
-    const hexToRgb = (hex) => {
-      hex = String(hex).replace("#", "");
-      const r = parseInt(hex.slice(0,2), 16);
-      const g = parseInt(hex.slice(2,4), 16);
-      const b = parseInt(hex.slice(4,6), 16);
-      return `${r}, ${g}, ${b}`;
-    };
-
-    function Confetto(){
-      this.color = colors[Math.floor(rr(0, colors.length))];
-      this.r = rr(2.5,4.5);
-      const rect = btn.getBoundingClientRect();
-      this.x = rr(rect.left, rect.right);
-      this.y = rr(rect.top, rect.bottom);
-      this.vx = rr(-8,8);
-      this.vy = rr(-12,-8);
-      this.o = rr(0.7,1);
-    }
-    function Sequin(){
-      const rect = btn.getBoundingClientRect();
-      this.c = colors[Math.floor(rr(0, colors.length))].front;
-      this.r = rr(1,2.5);
-      this.x = rr(rect.left, rect.right);
-      this.y = rr(rect.top, rect.bottom);
-      this.vx = rr(-6,6);
-      this.vy = rr(-10,-7);
-      this.o = rr(0.7,1);
-    }
-
-    const burst = () => {
-      for (let i=0;i<confettiCount;i++) confetti.push(new Confetto());
-      for (let i=0;i<sequinCount;i++)  sequins.push(new Sequin());
-    };
-
-    const render = () => {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-
-      confetti.forEach(p=>{
-        p.vx -= p.vx*dragConfetti;
-        p.vy += gravityConfetti;
-        p.x += p.vx; p.y += p.vy;
-        p.o = Math.max(0, p.o - 0.01);
-
-        ctx.fillStyle = `rgba(${hexToRgb(p.color.front)}, ${p.o})`;
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-      });
-
-      sequins.forEach(s=>{
-        s.vx -= s.vx*dragSequins;
-        s.vy += gravitySequins;
-        s.x += s.vx; s.y += s.vy;
-        s.o = Math.max(0, s.o - 0.015);
-
-        ctx.fillStyle = `rgba(${hexToRgb(s.c)}, ${s.o})`;
-        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
-      });
-
-      confetti = confetti.filter(p=>p.o>0.05 && p.y<canvas.height+30);
-      sequins  = sequins.filter(p=>p.o>0.05 && p.y<canvas.height+30);
-
-      requestAnimationFrame(render);
-    };
-    requestAnimationFrame(render);
-
-    return { burst };
-  }
-
-  function attachLogic(btn, powder){
-    let disabled = false;
-    const doRedirect = () => { if (REDIRECT_URL) location.href = REDIRECT_URL; };
-
+  function attachLogic(btn){
     btn.addEventListener("click", () => {
-      if (disabled) return;
-      disabled = true;
-      btn.classList.add("loading");
-
-      setTimeout(() => {
-        try { powder?.burst?.(); } catch(_){}
-        setTimeout(doRedirect, 650);
-      }, 450);
+      if (!REDIRECT_URL) return;
+      location.href = REDIRECT_URL;
     }, { passive: true });
   }
 
-  /* ===============================
-     HIDE/SHOW saat hamburger diklik
-     =============================== */
-  function setupAutoHide(wrap){
+  function setupToggleWithBlueButton(wrap){
+    if (!TOGGLE_SELECTOR) return; // tanpa selector, tidak bisa
+
     const hide = () => wrap.classList.add("is-hidden");
     const show = () => wrap.classList.remove("is-hidden");
 
-    // 1) Kalau ada selector tombol hamburger: paling akurat
-    if (TOGGLE_SELECTOR) {
-      document.addEventListener("click", (e) => {
-        const t = e.target;
-        if (t && t.closest && t.closest(TOGGLE_SELECTOR)) {
-          // toggle: kalau lagi tampil -> hide; kalau hidden -> show
-          wrap.classList.toggle("is-hidden");
-        }
-      }, true);
-    }
-
-    // 2) Kalau ada selector panel: pantau class/style berubah (open/active)
-    if (PANEL_SELECTOR) {
+    // Mode A (paling akurat): sync ke PANEL open/close (kalau tersedia)
+    const syncByPanel = () => {
+      if (!PANEL_SELECTOR) return false;
       const panel = document.querySelector(PANEL_SELECTOR);
-      if (panel) {
-        const isOpen = () => {
-          const cs = getComputedStyle(panel);
-          return panel.classList.contains("open") ||
-                 panel.classList.contains("active") ||
-                 cs.display !== "none" && cs.visibility !== "hidden" && cs.opacity !== "0";
-        };
+      if (!panel) return false;
 
-        // cek awal + observer
-        const sync = () => (isOpen() ? hide() : show());
-        sync();
+      const isOpen = () => {
+        const cs = getComputedStyle(panel);
+        return panel.classList.contains("open") ||
+               panel.classList.contains("active") ||
+               (cs.display !== "none" && cs.visibility !== "hidden" && cs.opacity !== "0");
+      };
 
-        const mo = new MutationObserver(sync);
-        mo.observe(panel, { attributes: true, attributeFilter: ["class", "style"] });
-      }
-    }
+      const apply = () => (isOpen() ? hide() : show());
+      apply();
 
-    // 3) Fallback: kalau klik area tombol menu biru (kiri bawah) -> hide
-    // (aman kalau selector belum ketemu)
-    document.addEventListener("click", (e) => {
-      const x = e.clientX, y = e.clientY;
-      const h = innerHeight;
-      // area kiri bawah sekitar tombol biru (kira-kira)
-      const inZone = x <= 90 && y >= (h - 140);
-      if (inZone) hide();
-    }, true);
+      const mo = new MutationObserver(apply);
+      mo.observe(panel, { attributes: true, attributeFilter: ["class","style"] });
+      return true;
+    };
 
-    // kalau user scroll/klik di luar, tampil lagi (opsional)
+    const synced = syncByPanel();
+
+    // Mode B: toggle setiap klik tombol biru
+    // (kalau Mode A aktif, ini tetap aman, karena setelah panel berubah observer akan sync lagi)
     document.addEventListener("click", (e) => {
       const t = e.target;
-      // kalau klik bukan area kiri bawah dan bukan tombol kita, munculin lagi
-      if (!t.closest || (!t.closest(`#${WRAP_ID}`))) {
-        const x = e.clientX, y = e.clientY;
-        const h = innerHeight;
-        const inZone = x <= 90 && y >= (h - 140);
-        if (!inZone) show();
-      }
+      const btnBlue = t && t.closest ? t.closest(TOGGLE_SELECTOR) : null;
+      if (!btnBlue) return;
+
+      // toggle cepat
+      wrap.classList.toggle("is-hidden");
     }, true);
   }
 
@@ -320,6 +174,7 @@
 
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
+
     wrap.innerHTML = `
       <button id="${BTN_ID}" type="button" aria-label="REKAN KAMI" title="REKAN KAMI">
         <div class="mauslot-icon" aria-hidden="true">
@@ -329,16 +184,6 @@
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
-
-        <div class="mauslot-loading" aria-hidden="true">
-          <div class="mauslot-powder">
-            <div class="mauslot-particle p1"></div>
-            <div class="mauslot-particle p2"></div>
-            <div class="mauslot-particle p3"></div>
-            <div class="mauslot-particle p4"></div>
-            <div class="mauslot-particle p5"></div>
-          </div>
-        </div>
       </button>
     `;
     document.body.appendChild(wrap);
@@ -346,9 +191,8 @@
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
 
-    const powder = initPowder(btn);
-    attachLogic(btn, powder);
-    setupAutoHide(wrap);
+    attachLogic(btn);
+    setupToggleWithBlueButton(wrap);
   }
 
   if (document.readyState === "loading") {
