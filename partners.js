@@ -1,13 +1,30 @@
+<script>
 (() => {
   "use strict";
 
-  const BTN_ID = "mauslotSubmitBtn";
-  const CANVAS_ID = "mauslotPowderCanvas";
-  const WRAP_ID = "mauslotFloatingBtnWrap";
+  const BTN_ID   = "mauslotSubmitBtn";
+  const CANVAS_ID= "mauslotPowderCanvas";
+  const WRAP_ID  = "mauslotFloatingBtnWrap";
   const STYLE_ID = "mauslotFloatingBtnStyles";
 
+  /* ==== SET LINK TUJUAN DI SINI ==== */
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
+  /* ==== (OPSIONAL) AGAR NEMPEL DI BAR KIRI DAN IKUT NAIK SAAT EXPAND ====
+     Isi selector container bar kiri kak.
+     Contoh (misal): ".floating-social", "#sticky-leftbar", ".side-float"
+     Kalau belum tahu, biarkan "" (kosong) -> tetap muncul fixed kiri bawah.
+  */
+  const STACK_SELECTOR = "";  // <-- isi ini kalau mau ikut naik bar kiri
+
+  /* ==== OFFSET POSISI ==== */
+  const DESKTOP_LEFT = 18;
+  const DESKTOP_BOTTOM = 18;
+
+  // Ini yang bikin gak nutup tombol hijau (bottom nav) di mobile
+  const MOBILE_BOTTOM = 118; // kalau masih nabrak, naikin jadi 130-150
+
+  // Cegah double-mount
   if (document.getElementById(WRAP_ID)) return;
 
   const css = `
@@ -20,125 +37,120 @@
       z-index: 99998;
     }
 
+    /* WRAP default: kiri bawah (kotak merah) */
     #${WRAP_ID}{
       position: fixed;
-      left: 18px;
-      bottom: 18px;
+      left: ${DESKTOP_LEFT}px;
+      bottom: ${DESKTOP_BOTTOM}px;
       z-index: 99999;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
+      display: grid;
+      place-items: center;
     }
 
-    /* MOBILE */
+    /* MOBILE: naikin supaya tidak nutup bottom nav (hijau) */
     @media (max-width: 768px){
       #${WRAP_ID}{
-        --lift: 28px; /* naikkan kalau masih ketutup bottom bar */
-        left: 16px !important;
-        bottom: calc(74px + var(--lift) + env(safe-area-inset-bottom, 0px)) !important;
+        left: ${DESKTOP_LEFT}px !important;
+        bottom: calc(${MOBILE_BOTTOM}px + env(safe-area-inset-bottom, 0px)) !important;
+        transform: none !important;
       }
     }
 
-    /* ====== BUTTON BULAT ====== */
+    /* ===== BUTTON BULAT ===== */
     #${BTN_ID}{
       width: 56px;
       height: 56px;
       border-radius: 999px;
-      border: 0;
-      padding: 0;
+      border: none;
       cursor: pointer;
-      background: transparent;
       position: relative;
+      padding: 0;
       outline: none;
+      background: none;
       -webkit-tap-highlight-color: transparent;
-      filter: drop-shadow(0 14px 26px rgba(0,0,0,.45));
+      filter: drop-shadow(0 12px 22px rgba(0,0,0,.45));
     }
 
-    /* Ring/Glow luar */
+    @keyframes mauslotButtonPulse{
+      0%{background-position:0% 50%}
+      50%{background-position:100% 50%}
+      100%{background-position:0% 50%}
+    }
+
+    /* lingkaran gradient */
     #${BTN_ID}::before{
       content:'';
       position:absolute;
-      inset: 0;
+      inset:0;
       border-radius: 999px;
-      background: conic-gradient(from 180deg,
-        #2FB8FF, #1A7BFF, #0B4DB2, #0A2C6D, #07163A, #0B4DB2, #1A7BFF, #2FB8FF
-      );
-      animation: mauslotSpin 2.8s linear infinite;
+      background: linear-gradient(90deg,#050B1C,#07163A,#0A2C6D,#0B4DB2,#1A7BFF,#2FB8FF,#0B4DB2,#07163A);
+      background-size: 700% 700%;
+      animation: mauslotButtonPulse 9s ease-in-out infinite;
       box-shadow:
-        0 0 0 1px rgba(120,190,255,.20) inset,
-        0 0 22px rgba(70,160,255,.25);
+        0 2px 6px rgba(0,0,0,.55) inset,
+        0 0 0 1px rgba(120,190,255,.18) inset,
+        0 10px 26px rgba(0,0,0,.35);
+      transition: transform .15s ease, filter .15s ease;
     }
 
-    /* Body dalam */
-    #${BTN_ID}::after{
-      content:'';
-      position:absolute;
-      inset: 4px;
-      border-radius: 999px;
-      background: radial-gradient(120% 120% at 30% 20%, rgba(60,190,255,.35), transparent 55%),
-                  linear-gradient(180deg,#061434,#050B1C);
-      box-shadow:
-        0 10px 24px rgba(0,0,0,.45),
-        0 1px 0 rgba(255,255,255,.06) inset;
+    #${BTN_ID}:active::before{
+      transform: scale(.96);
+      filter: brightness(1.05);
     }
 
-    @keyframes mauslotSpin{
-      to{ transform: rotate(360deg); }
-    }
-
-    /* Isi tombol (ikon) */
-    .mauslot-circle{
+    /* isi icon */
+    .mauslot-icon{
       position:absolute;
       inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index: 2;
-      color: #EAF3FF;
-      user-select:none;
+      display:grid;
+      place-items:center;
+      z-index:1;
       pointer-events:none;
+      color:#EAF3FF;
     }
-    .mauslot-circle svg{
+    .mauslot-icon svg{
       width: 22px;
       height: 22px;
-      fill:none;
-      stroke: currentColor;
-      stroke-width: 2.4;
-      stroke-linecap: round;
-      stroke-linejoin: round;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
-      opacity: .95;
     }
 
-    /* State loading/complete (tetap kompatibel) */
-    #${BTN_ID}.loading::before{ opacity: .55; }
-    #${BTN_ID}.complete::before{ opacity: 1; }
-
-    /* Animasi powder kecil di tengah saat loading */
-    .mauslot-mini-powder{
+    /* Badge kecil optional */
+    .mauslot-badge{
       position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index: 3;
-      opacity: 0;
-      transition: opacity .2s ease;
+      right:-2px;
+      top:-2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(47,184,255,.95);
+      box-shadow: 0 0 0 2px rgba(5,11,28,.9);
+      display:none; /* kalau mau tampilkan, ganti jadi grid */
+      place-items:center;
+      font-size: 11px;
+      font-weight: 900;
+      color:#07163A;
+      z-index:2;
       pointer-events:none;
     }
-    #${BTN_ID}.loading .mauslot-mini-powder{ opacity: 1; }
-    #${BTN_ID}.loading .mauslot-circle{ opacity: 0; }
 
-    .mauslot-powder{
-      position: relative;
-      width: 22px;
-      height: 22px;
-    }
-    .mauslot-particle{
+    /* ====== powder loader kecil (tetap ada, tapi ringkas) ====== */
+    .mauslot-loading{
       position:absolute;
-      width:6px;height:6px;border-radius:50%;
+      inset:0;
+      display:grid;
+      place-items:center;
+      opacity:0;
+      z-index:2;
+      pointer-events:none;
+      transition: opacity .2s ease;
+    }
+    #${BTN_ID}.loading .mauslot-loading{ opacity:1; }
+
+    .mauslot-powder{ position: relative; width: 22px; height: 22px; }
+    .mauslot-particle{
+      position:absolute; width:6px;height:6px;border-radius:50%;
       top:8px;left:8px;
-      animation: mauslotPowder 1.5s ease-in-out infinite;
+      animation: mauslotPowder 1.1s ease-in-out infinite;
       box-shadow: 0 0 10px rgba(90,180,255,.18);
     }
     @keyframes mauslotPowder{
@@ -178,7 +190,6 @@
 
     let confetti = [];
     let sequins = [];
-    let rafId = null;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -205,7 +216,6 @@
       const x = randomRange(xRange[0], xRange[1]);
       const range = yRange[1] - yRange[0] + 1;
       let y = yRange[1] - Math.abs(randomRange(0, range) + randomRange(0, range) - range);
-      if (y >= yRange[1] - 1) y += (Math.random() < 0.25) ? randomRange(1, 3) : 0;
       return { x, y: -y };
     };
 
@@ -217,45 +227,45 @@
       return `${r}, ${g}, ${b}`;
     };
 
-    function Confetto() {
-      this.randomModifier = randomRange(0, 99);
+    function Confetto(){
       this.color = colors[Math.floor(randomRange(0, colors.length))];
-      this.dimensions = { x: randomRange(4, 9), y: randomRange(3, 7) };
+      this.isCircular = Math.random() < 0.7;
+      this.dimensions = this.isCircular
+        ? { x: randomRange(5,9), y: randomRange(5,9) }
+        : { x: randomRange(4,10), y: randomRange(3,8) };
 
       const rect = btn.getBoundingClientRect();
       this.position = {
-        x: randomRange(rect.left + rect.width*0.2, rect.left + rect.width*0.8),
-        y: randomRange(rect.top + rect.height*0.2, rect.top + rect.height*1.2),
+        x: randomRange(rect.left + rect.width*0.25, rect.left + rect.width*0.75),
+        y: randomRange(rect.top + rect.height*0.25, rect.top + rect.height*1.2),
       };
-
-      this.rotation = randomRange(0, 2 * Math.PI);
-      this.scale = { x: 1, y: 1 };
-      this.velocity = initVelocity([-10, 10], [10, 15]);
+      this.rotation = randomRange(0, 2*Math.PI);
+      this.scale = { x:1, y:1 };
       this.opacity = randomRange(0.7, 1.0);
+      this.velocity = initVelocity([-10,10], [10,14]);
+      this.randomModifier = randomRange(0,99);
     }
-
-    Confetto.prototype.update = function () {
+    Confetto.prototype.update = function(){
       this.velocity.x -= this.velocity.x * dragConfetti;
       this.velocity.y = Math.min(this.velocity.y + gravityConfetti, terminalVelocity);
       this.position.x += this.velocity.x;
       this.position.y += this.velocity.y;
-      this.scale.y = Math.max(0.1, Math.cos((this.position.y + this.randomModifier) * 0.09));
+      this.scale.y = Math.max(0.1, Math.cos((this.position.y + this.randomModifier)*0.09));
       this.opacity = Math.max(0, this.opacity - 0.008);
     };
 
-    function Sequin() {
+    function Sequin(){
       const rect = btn.getBoundingClientRect();
-      this.color = colors[Math.floor(randomRange(0, colors.length))].front;
-      this.radius = randomRange(1, 3);
+      this.color = colors[Math.floor(randomRange(0,colors.length))].front;
+      this.radius = randomRange(1,3);
       this.position = {
-        x: randomRange(rect.left + rect.width*0.2, rect.left + rect.width*0.8),
-        y: randomRange(rect.top + rect.height*0.2, rect.top + rect.height*1.2),
+        x: randomRange(rect.left + rect.width*0.25, rect.left + rect.width*0.75),
+        y: randomRange(rect.top + rect.height*0.25, rect.top + rect.height*1.2),
       };
-      this.velocity = { x: randomRange(-8, 8), y: randomRange(-10, -14) };
-      this.opacity = randomRange(0.8, 1.0);
+      this.velocity = { x: randomRange(-7,7), y: randomRange(-10,-13) };
+      this.opacity = randomRange(0.8,1.0);
     }
-
-    Sequin.prototype.update = function () {
+    Sequin.prototype.update = function(){
       this.velocity.x -= this.velocity.x * dragSequins;
       this.velocity.y += gravitySequins;
       this.position.x += this.velocity.x;
@@ -264,12 +274,12 @@
     };
 
     const burst = () => {
-      for (let i = 0; i < confettiCount; i++) confetti.push(new Confetto());
-      for (let i = 0; i < sequinCount; i++) sequins.push(new Sequin());
+      for (let i=0;i<confettiCount;i++) confetti.push(new Confetto());
+      for (let i=0;i<sequinCount;i++) sequins.push(new Sequin());
     };
 
     const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
 
       confetti.forEach(c => {
         const w = c.dimensions.x * c.scale.x;
@@ -277,10 +287,13 @@
         ctx.translate(c.position.x, c.position.y);
         ctx.rotate(c.rotation);
         c.update();
-
         const rgb = hexToRgb(c.scale.y > 0 ? c.color.front : c.color.back);
         ctx.fillStyle = `rgba(${rgb}, ${c.opacity})`;
-        ctx.fillRect(-w/2, -w/2, w, c.dimensions.y);
+        if (c.isCircular){
+          ctx.beginPath(); ctx.arc(0,0,w/2,0,2*Math.PI); ctx.fill();
+        } else {
+          ctx.fillRect(-w/2,-w/3,w,w*0.7);
+        }
         ctx.restore();
       });
 
@@ -289,66 +302,78 @@
         ctx.translate(s.position.x, s.position.y);
         s.update();
         ctx.fillStyle = `rgba(${hexToRgb(s.color)}, ${s.opacity})`;
-        ctx.beginPath(); ctx.arc(0, 0, s.radius, 0, 2 * Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(0,0,s.radius,0,2*Math.PI); ctx.fill();
         ctx.restore();
       });
 
       confetti = confetti.filter(c => c.position.y < canvas.height && c.opacity > 0.1);
       sequins  = sequins.filter(s => s.position.y < canvas.height && s.opacity > 0.1);
 
-      rafId = requestAnimationFrame(render);
+      requestAnimationFrame(render);
     };
+    requestAnimationFrame(render);
 
-    rafId = requestAnimationFrame(render);
     return { burst };
   }
 
-  function attachLogic(btn, powder) {
+  function attachLogic(btn, powder){
     let disabled = false;
 
     const doRedirect = () => {
-      if (!REDIRECT_URL || REDIRECT_URL === "ISI_LINK_KAMU_DI_SINI") return;
+      if (!REDIRECT_URL) return;
       window.location.href = REDIRECT_URL;
+      // window.open(REDIRECT_URL, "_blank");
     };
 
-    const click = () => {
+    btn.addEventListener("click", () => {
       if (disabled) return;
       disabled = true;
 
       btn.classList.add("loading");
 
       setTimeout(() => {
-        btn.classList.add("complete");
-        btn.classList.remove("loading");
+        try { powder && powder.burst && powder.burst(); } catch(_){}
+        setTimeout(doRedirect, 650);
+      }, 650);
 
-        setTimeout(() => {
-          try { powder && powder.burst && powder.burst(); } catch (_) {}
-          setTimeout(doRedirect, 650);
-        }, 200);
-
-      }, 900);
-    };
-
-    btn.addEventListener("click", click, { passive: true });
+    }, { passive: true });
   }
 
-  function mount() {
+  function tryAttachToLeftStack(wrap){
+    if (!STACK_SELECTOR) return false;
+    const host = document.querySelector(STACK_SELECTOR);
+    if (!host) return false;
+
+    // ikut “barisan” menu kiri
+    wrap.style.position = "static";
+    wrap.style.left = "auto";
+    wrap.style.bottom = "auto";
+    wrap.style.zIndex = "99999";
+    host.appendChild(wrap);
+    return true;
+  }
+
+  function mount(){
     injectCSS();
     ensureCanvas();
 
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
+
     wrap.innerHTML = `
-      <button id="${BTN_ID}" type="button" aria-label="REKAN KAMI">
-        <div class="mauslot-circle" aria-hidden="true">
-          <!-- icon panah bawah (mirip contoh) -->
-          <svg viewBox="0 0 24 24">
-            <path d="M12 5v11"></path>
-            <path d="M7 13l5 5 5-5"></path>
+      <button id="${BTN_ID}" type="button" aria-label="REKAN KAMI" title="REKAN KAMI">
+        <div class="mauslot-icon" aria-hidden="true">
+          <!-- icon panah / download style -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3v10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
 
-        <div class="mauslot-mini-powder" aria-hidden="true">
+        <div class="mauslot-badge">1</div>
+
+        <div class="mauslot-loading" aria-hidden="true">
           <div class="mauslot-powder">
             <div class="mauslot-particle p1"></div>
             <div class="mauslot-particle p2"></div>
@@ -359,7 +384,10 @@
         </div>
       </button>
     `;
-    document.body.appendChild(wrap);
+
+    // kalau bisa, tempel ke bar kiri (biar ikut naik saat expand)
+    const attached = tryAttachToLeftStack(wrap);
+    if (!attached) document.body.appendChild(wrap);
 
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
@@ -374,3 +402,4 @@
     mount();
   }
 })();
+</script>
