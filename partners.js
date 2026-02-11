@@ -9,7 +9,7 @@
 
   // Jarak tombol kita dari tombol biru (hamburger)
   const GAP_BELOW_BLUE = 14;   // (atur 10-20)
-  const LEFT_NUDGE = 0;        // geser kiri/kanan kalau perlu (mis. -2 / +2)
+  const LEFT_NUDGE = -2;        // geser kiri/kanan kalau perlu (mis. -2 / +2)
 
   // ukuran tombol
   const SIZE = 56;
