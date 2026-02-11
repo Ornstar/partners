@@ -8,9 +8,9 @@
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
   // Jarak tombol kita di bawah tombol biru
-  const GAP_BELOW_BLUE = 12;   // 8-18
+  const GAP_BELOW_BLUE = 10;   // 8-18
   // Fine tune kiri/kanan (kalau masih meleset sedikit)
-  const X_NUDGE = 0;           // contoh: -2 atau +2
+  const X_NUDGE = -1;           // contoh: -2 atau +2
   // Ukuran tombol kita
   const SIZE = 56;
 
