@@ -7,16 +7,16 @@
 
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  // Jarak tombol kita di bawah tombol biru
-  const GAP_BELOW_BLUE = 5;   // 8-18
-  // Fine tune kiri/kanan (kalau masih meleset sedikit)
-  const X_NUDGE = -5;           // contoh: -2 atau +2
-  // Ukuran tombol kita
+  // Jarak tombol kita dari tombol biru
+  const GAP = 8;          // 6-14
+  const X_NUDGE = -5;     // geser kiri/kanan kalau perlu
   const SIZE = 56;
 
-  // Kalau kaka tahu selector tombol hamburger, isi biar 100% akurat
-  // contoh: ".floating-social .hamburg" atau "#hamburger"
+  // Kalau tahu selector tombol hamburger, isi biar pasti tepat
   const TOGGLE_SELECTOR = "";
+
+  // Jaga jarak dari bawah layar (biar gak masuk footer)
+  const SAFE_BOTTOM = 12; // 10-24
 
   if (document.getElementById(WRAP_ID)) return;
 
@@ -99,72 +99,69 @@
     const nearBottom = (window.innerHeight - r.bottom) < 170;
     if (!nearLeft || !nearBottom) return -20;
 
-    // ukuran masuk akal buat tombol bulat/hamburger
     if (r.width < 32 || r.width > 110 || r.height < 32 || r.height > 110) return -10;
 
     let s = 0;
-
-    // makin dekat kiri bawah makin tinggi
     s += Math.max(0, 90 - r.left) * 0.5;
     s += Math.max(0, 170 - (window.innerHeight - r.bottom)) * 0.3;
 
     const txt = (el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || "").toLowerCase();
     const cls = (el.className || "").toString().toLowerCase();
 
-    // keyword umum tombol menu/hamburger
     if (cls.includes("hamb") || cls.includes("burger")) s += 80;
     if (cls.includes("menu") || cls.includes("toggle")) s += 45;
     if (txt.includes("menu") || txt.includes("hamb") || txt.includes("toggle")) s += 55;
 
-    // kalau ada svg/icon di dalamnya
     if (el.querySelector("svg")) s += 15;
 
-    // bonus kalau bentuknya kotak/bulat tombol (border radius besar)
     const br = parseFloat(cs.borderRadius) || 0;
     if (br >= 10) s += 10;
 
-    // jangan sampai yang kepilih tombol kita sendiri
     if (el.closest(`#${WRAP_ID}`)) s -= 999;
 
     return s;
   }
 
   function findBlueHamburger(){
-    // 1) kalau user isi selector, pakai itu dulu
     if (TOGGLE_SELECTOR) {
       const el = document.querySelector(TOGGLE_SELECTOR);
       if (el && isVisible(el)) return el;
     }
 
-    // 2) heuristik: cari kandidat fixed dekat kiri bawah
     const nodes = Array.from(document.querySelectorAll("button,a,div"))
       .filter(el => el && el !== document.body && el !== document.documentElement);
 
-    let best = null;
-    let bestScore = -999;
-
+    let best = null, bestScore = -999;
     for (const el of nodes) {
       const sc = scoreHamburger(el);
-      if (sc > bestScore) {
-        bestScore = sc;
-        best = el;
-      }
+      if (sc > bestScore) { bestScore = sc; best = el; }
     }
-
     return bestScore >= 10 ? best : null;
   }
 
-  function placeUnderBlue(wrap, blueBtn){
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+  function placeSmart(wrap, blueBtn){
     const r = blueBtn.getBoundingClientRect();
 
-    // ✅ sejajarkan CENTER tombol kita dengan CENTER tombol biru
+    // sejajarkan center tombol kita dengan center tombol biru
     const left = r.left + (r.width - SIZE) / 2 + X_NUDGE;
+    const x = clamp(left, 6, window.innerWidth - SIZE - 6);
 
-    // ✅ tepat di bawah tombol biru
-    const top = r.bottom + GAP_BELOW_BLUE;
+    // coba taruh di bawah dulu
+    const topBelow = r.bottom + GAP;
 
-    wrap.style.left = Math.max(6, Math.min(left, window.innerWidth - SIZE - 6)) + "px";
-    wrap.style.top  = Math.max(6, Math.min(top,  window.innerHeight - SIZE - 6)) + "px";
+    // kalau di bawah "nabrak" bawah layar/footer -> pindah ke atas tombol biru
+    const wouldHitBottom = (topBelow + SIZE) > (window.innerHeight - SAFE_BOTTOM);
+
+    const top = wouldHitBottom
+      ? (r.top - GAP - SIZE)   // posisi kotak merah (di atas tombol biru)
+      : topBelow;              // normal: di bawah tombol biru
+
+    const y = clamp(top, 6, window.innerHeight - SIZE - SAFE_BOTTOM);
+
+    wrap.style.left = x + "px";
+    wrap.style.top  = y + "px";
     wrap.style.bottom = "auto";
   }
 
@@ -207,17 +204,15 @@
 
       if (blue) {
         const r = blue.getBoundingClientRect();
-        const key = `${Math.round(r.left)}|${Math.round(r.top)}|${Math.round(r.width)}|${Math.round(r.height)}`;
+        const key = `${Math.round(r.left)}|${Math.round(r.top)}|${Math.round(r.width)}|${Math.round(r.height)}|${window.innerHeight}`;
         if (key !== lastKey) {
           lastKey = key;
-          placeUnderBlue(wrap, blue);
+          placeSmart(wrap, blue);
         }
       }
-
       requestAnimationFrame(tick);
     };
 
-    // start loop (paling stabil buat ikut naik/turun pas expand/close)
     requestAnimationFrame(tick);
   }
 
