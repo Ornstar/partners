@@ -105,19 +105,19 @@
     return candidates[0] || null;
   }
 
-  function placeUnderBlue(wrap, blueBtn){
-    const r = blueBtn.getBoundingClientRect();
+function placeUnderBlue(wrap, blueBtn){
+  const r = blueBtn.getBoundingClientRect();
 
-    // center align mengikuti tombol biru
-    const left = (r.left + r.width/2) - (SIZE/2) + LEFT_NUDGE;
+  // ✅ sejajar kiri (bukan center)
+  const left = r.left + LEFT_NUDGE;
 
-    // posisinya di bawah tombol biru (kotak merah)
-    const top = r.bottom + GAP_BELOW_BLUE;
+  // ✅ taruh tepat di bawah tombol biru
+  const top = r.bottom + GAP_BELOW_BLUE;
 
-    wrap.style.left = Math.max(6, Math.min(left, window.innerWidth - SIZE - 6)) + "px";
-    wrap.style.top  = Math.max(6, Math.min(top,  window.innerHeight - SIZE - 6)) + "px";
-    wrap.style.bottom = "auto";
-  }
+  wrap.style.left = Math.max(6, Math.min(left, window.innerWidth - SIZE - 6)) + "px";
+  wrap.style.top  = Math.max(6, Math.min(top,  window.innerHeight - SIZE - 6)) + "px";
+  wrap.style.bottom = "auto";
+}
 
   function attachRedirect(btn){
     btn.addEventListener("click", (e) => {
