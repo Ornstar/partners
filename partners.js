@@ -7,12 +7,16 @@
 
   const REDIRECT_URL = "https://urlpsjshorten.com/pasjackpot";
 
-  // Jarak tombol kita dari tombol biru (hamburger)
-  const GAP_BELOW_BLUE = 14;   // (atur 10-20)
-  const LEFT_NUDGE = -2;        // geser kiri/kanan kalau perlu (mis. -2 / +2)
-
-  // ukuran tombol
+  // Jarak tombol kita di bawah tombol biru
+  const GAP_BELOW_BLUE = 12;   // 8-18
+  // Fine tune kiri/kanan (kalau masih meleset sedikit)
+  const X_NUDGE = 0;           // contoh: -2 atau +2
+  // Ukuran tombol kita
   const SIZE = 56;
+
+  // Kalau kaka tahu selector tombol hamburger, isi biar 100% akurat
+  // contoh: ".floating-social .hamburg" atau "#hamburger"
+  const TOGGLE_SELECTOR = "";
 
   if (document.getElementById(WRAP_ID)) return;
 
@@ -23,6 +27,7 @@
       width:${SIZE}px;height:${SIZE}px;
       display:grid;place-items:center;
       left: 16px;
+      top: auto;
       bottom: 120px;
       pointer-events:auto;
     }
@@ -82,42 +87,86 @@
     return r.width > 20 && r.height > 20;
   }
 
-  // Cari tombol biru hamburger: fixed, kiri bawah, ukuran sekitar tombol, paling bawah di kiri
-  function findBlueHamburger(){
-    const candidates = Array.from(document.querySelectorAll("button,a,div"))
-      .filter(el => {
-        const cs = getComputedStyle(el);
-        if (cs.position !== "fixed") return false;
-        if (!isVisible(el)) return false;
+  function scoreHamburger(el){
+    if (!el || el.id === BTN_ID || el.id === WRAP_ID) return -999;
+    if (!isVisible(el)) return -999;
 
-        const r = el.getBoundingClientRect();
-        const nearLeft = r.left < 80;
-        const nearBottom = (window.innerHeight - r.bottom) < 140;
-        if (!nearLeft || !nearBottom) return false;
+    const cs = getComputedStyle(el);
+    if (cs.position !== "fixed") return -50;
 
-        if (r.width < 35 || r.width > 95) return false;
-        if (r.height < 35 || r.height > 95) return false;
+    const r = el.getBoundingClientRect();
+    const nearLeft = r.left < 90;
+    const nearBottom = (window.innerHeight - r.bottom) < 170;
+    if (!nearLeft || !nearBottom) return -20;
 
-        return true;
-      });
+    // ukuran masuk akal buat tombol bulat/hamburger
+    if (r.width < 32 || r.width > 110 || r.height < 32 || r.height > 110) return -10;
 
-    candidates.sort((a,b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
-    return candidates[0] || null;
+    let s = 0;
+
+    // makin dekat kiri bawah makin tinggi
+    s += Math.max(0, 90 - r.left) * 0.5;
+    s += Math.max(0, 170 - (window.innerHeight - r.bottom)) * 0.3;
+
+    const txt = (el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || "").toLowerCase();
+    const cls = (el.className || "").toString().toLowerCase();
+
+    // keyword umum tombol menu/hamburger
+    if (cls.includes("hamb") || cls.includes("burger")) s += 80;
+    if (cls.includes("menu") || cls.includes("toggle")) s += 45;
+    if (txt.includes("menu") || txt.includes("hamb") || txt.includes("toggle")) s += 55;
+
+    // kalau ada svg/icon di dalamnya
+    if (el.querySelector("svg")) s += 15;
+
+    // bonus kalau bentuknya kotak/bulat tombol (border radius besar)
+    const br = parseFloat(cs.borderRadius) || 0;
+    if (br >= 10) s += 10;
+
+    // jangan sampai yang kepilih tombol kita sendiri
+    if (el.closest(`#${WRAP_ID}`)) s -= 999;
+
+    return s;
   }
 
-function placeUnderBlue(wrap, blueBtn){
-  const r = blueBtn.getBoundingClientRect();
+  function findBlueHamburger(){
+    // 1) kalau user isi selector, pakai itu dulu
+    if (TOGGLE_SELECTOR) {
+      const el = document.querySelector(TOGGLE_SELECTOR);
+      if (el && isVisible(el)) return el;
+    }
 
-  // ✅ sejajar kiri (bukan center)
-  const left = r.left + LEFT_NUDGE;
+    // 2) heuristik: cari kandidat fixed dekat kiri bawah
+    const nodes = Array.from(document.querySelectorAll("button,a,div"))
+      .filter(el => el && el !== document.body && el !== document.documentElement);
 
-  // ✅ taruh tepat di bawah tombol biru
-  const top = r.bottom + GAP_BELOW_BLUE;
+    let best = null;
+    let bestScore = -999;
 
-  wrap.style.left = Math.max(6, Math.min(left, window.innerWidth - SIZE - 6)) + "px";
-  wrap.style.top  = Math.max(6, Math.min(top,  window.innerHeight - SIZE - 6)) + "px";
-  wrap.style.bottom = "auto";
-}
+    for (const el of nodes) {
+      const sc = scoreHamburger(el);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = el;
+      }
+    }
+
+    return bestScore >= 10 ? best : null;
+  }
+
+  function placeUnderBlue(wrap, blueBtn){
+    const r = blueBtn.getBoundingClientRect();
+
+    // ✅ sejajarkan CENTER tombol kita dengan CENTER tombol biru
+    const left = r.left + (r.width - SIZE) / 2 + X_NUDGE;
+
+    // ✅ tepat di bawah tombol biru
+    const top = r.bottom + GAP_BELOW_BLUE;
+
+    wrap.style.left = Math.max(6, Math.min(left, window.innerWidth - SIZE - 6)) + "px";
+    wrap.style.top  = Math.max(6, Math.min(top,  window.innerHeight - SIZE - 6)) + "px";
+    wrap.style.bottom = "auto";
+  }
 
   function attachRedirect(btn){
     btn.addEventListener("click", (e) => {
@@ -150,22 +199,26 @@ function placeUnderBlue(wrap, blueBtn){
     if (btn) attachRedirect(btn);
 
     let blue = null;
+    let lastKey = "";
 
-    const sync = () => {
-      blue = findBlueHamburger();
-      if (blue) placeUnderBlue(wrap, blue);
+    const tick = () => {
+      const found = findBlueHamburger();
+      if (found) blue = found;
+
+      if (blue) {
+        const r = blue.getBoundingClientRect();
+        const key = `${Math.round(r.left)}|${Math.round(r.top)}|${Math.round(r.width)}|${Math.round(r.height)}`;
+        if (key !== lastKey) {
+          lastKey = key;
+          placeUnderBlue(wrap, blue);
+        }
+      }
+
+      requestAnimationFrame(tick);
     };
 
-    // initial + keep sync
-    sync();
-    window.addEventListener("resize", sync, { passive:true });
-    window.addEventListener("scroll", sync, { passive:true });
-
-    // kalau tombol biru muncul agak telat
-    const timer = setInterval(() => {
-      sync();
-      if (findBlueHamburger()) clearInterval(timer);
-    }, 250);
+    // start loop (paling stabil buat ikut naik/turun pas expand/close)
+    requestAnimationFrame(tick);
   }
 
   if (document.readyState === "loading") {
